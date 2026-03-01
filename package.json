@@ -1,0 +1,23 @@
+{
+  "name": "recon-agent",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Multi-chain DeFi reconciliation agent — GAAP/IFRS journal entries, cost basis tracking, audit-ready reports",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "dev": "bun --watch run src/index.ts",
+    "typecheck": "bunx tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.95.0",
+    "pino": "^9.6.0",
+    "pino-pretty": "^13.0.0",
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.0",
+    "typescript": "^5.7.0"
+  }
+}
