@@ -17,6 +17,149 @@ It is **Product #1** of a larger platform called **TreasuryOS** - an AI-native t
 
 ---
 
+## TreasuryOS Platform Context
+
+**Read this section before touching any code.** ReconAgent is not a standalone tool. It is the foundation layer of a 10-agent platform. Every engineering decision you make should account for this.
+
+### The Vision
+
+TreasuryOS is an AI-native treasury control plane for crypto-native enterprises. The end state is a platform where specialized agents handle treasury operations that currently require human analysts: reconciliation, yield optimization, governance execution, diversification, tax reporting, risk monitoring, month-end close, payroll/AP, financial reporting, and stablecoin management.
+
+The target is $400M exit via 10-30 enterprise clients at $2-10M/year contracts. Not a consumer product. Not a dashboard. An operational control layer that replaces headcount.
+
+### The 10-Agent Architecture
+
+```
+  1. ReconAgent ────┐    Multi-chain reconciliation (THIS REPO)
+  2. YieldPilot ────┤    Autonomous yield optimization
+  3. GovExec ───────┤    Governance-to-execution automation
+  4. DiversifyAgent ┤    Treasury diversification (TWAP selling)
+  5. TaxLot ────────┤    Per-wallet cost basis + 1099-DA generation
+  6. RiskGuard ─────┼──> TREASURYOS
+  7. CloseAgent ────┤    - Shared treasury state across all agents
+  8. PayAgent ──────┤    - Role-based access (analyst/approver/viewer/compliance)
+  9. BriefAgent ────┤    - Approval workflows (agent proposes, human confirms)
+  10. StableShield ─┘    - Cross-agent orchestration + enterprise SLAs
+```
+
+ReconAgent is **Product #1** because reconciliation is the foundation. You can't optimize yield (YieldPilot), assess risk (RiskGuard), automate month-end close (CloseAgent), or generate treasury reports (BriefAgent) without first knowing exactly what happened on-chain. Every other agent depends on ReconAgent's classified, priced, and journaled transaction data.
+
+### How Other Agents Consume ReconAgent's Data
+
+| Agent | What It Reads From ReconAgent | What It Does With It |
+|---|---|---|
+| **YieldPilot** | Classified transactions (stakes, lending, LP) | Tracks yield performance, suggests reallocation |
+| **RiskGuard** | Anomaly events, protocol classifications | Monitors protocol exposure, flags concentration risk |
+| **CloseAgent** | Journal entries, bridge matches, recon reports | Automates month-end close (3 weeks down to 3 hours) |
+| **TaxLot** | Cost basis lots, gain/loss calculations | Generates 1099-DA exports, tax optimization |
+| **BriefAgent** | Recon reports, classification summaries | Produces weekly AI Treasury Briefing |
+| **PayAgent** | Transaction classifications, wallet balances | Matches payments to invoices, tracks AP aging |
+| **StableShield** | Stablecoin holdings, pricing data | Monitors concentration risk, de-peg exposure |
+| **GovExec** | Bridge matches, transaction status | Queues multisig transactions, tracks execution |
+| **DiversifyAgent** | Token balances, cost basis data | Executes diversification within approved bounds |
+
+### The Four-Layer Platform Architecture
+
+```
+Layer 1: PUBLIC WEDGE (Distribution)
+    Web dashboard, weekly treasury briefing, risk alerts
+    Attracts crypto-native teams, validates workflows, generates leads
+
+Layer 2: AGENT RUNTIME (Infrastructure)
+    Persistent agents with memory, tool access, autonomous execution
+    ReconAgent and the other 9 products live here
+
+Layer 3: VERTICALIZED AGENT ROLES (Revenue)
+    Replace headcount: treasury analyst, compliance monitor, reconciliation agent
+    $60K-$250K/year per agent role per client
+
+Layer 4: CONTROL, GOVERNANCE & GUARANTEES (Moat)
+    Audit trails, compliance abstractions, rollback, supervision, SLAs
+    This is what justifies enterprise pricing and prevents churn
+```
+
+ReconAgent currently lives in Layer 2 (the engine) but its audit trail and compliance features are already building Layer 4 (the moat). The web dashboard and weekly briefing (not yet built) are Layer 1 (the wedge that gets users in the door).
+
+### Go-to-Market Timeline
+
+**Phase A (Months 0-4): Crypto-Native Treasury Copilot**
+- Target: crypto startups, small funds, DAOs with $500K-$20M on-chain treasury
+- ReconAgent backend + web dashboard + weekly AI treasury briefing + risk alerts
+- Monetization: Free tier + Pro ($49-299/mo) + Fund ($999+/mo)
+- Goal: 2-3 design partners who co-develop with us
+
+**Phase B (Months 4-12): Hybrid Treasury Copilot**
+- Add bank + accounting integrations (CSV, Stripe, Mercury, Wise, Xero/QB sync)
+- Add role-based access (Treasury Analyst, Approver, Viewer, Compliance)
+- Add approval-based action layer (agent proposes, human confirms)
+- Positioning shift: "AI-native treasury control plane"
+
+**Phase C (Months 10-12+): Enterprise Scale**
+- Formalize contracts + SLAs
+- $50K-$250K pilot pricing
+- Case studies: "Reduced treasury ops by 42%", "Replaced 3 analysts with AI"
+
+The code you write will be running against real treasuries within weeks, not months. Design partners are already being engaged.
+
+### Validated Market Pain
+
+- **karpatkey** manages $1.8B across 7+ DAOs with custom bots that aren't productized
+- **Arbitrum DAO** ran a full governance committee just to deploy $30M in RWAs
+- **94% of crypto finance teams** still use Excel for month-end close
+- **Fireblocks paid $130M** for TRES Finance (reconciliation alone)
+- **Parcel processed $250M+** in DAO payments and shut down - the problem is real, the business model matters
+- **DAOs lose ~12.4% annually** in potential yield due to manual treasury management
+
+### Competitive Landscape
+
+| Competitor | Approach | Our Differentiation |
+|---|---|---|
+| **TRES Finance** (acquired by Fireblocks for $130M) | Aggregates from 220+ sources, enterprise | We're DeFi-deep: understand protocol mechanics, not just "known contracts" |
+| **Bitwave** | Enterprise crypto accounting, Deloitte partner | We're AI-native with autonomous classification, not rule-based |
+| **Cryptio** | Crypto accounting for funds | We handle cross-chain bridge correlation and rebasing tokens |
+| **Coinshift** | DAO treasury platform, multisig + cashflow | We generate accounting-grade journal entries, not just dashboards |
+| **Request Finance** | Crypto invoicing for DAOs | We're the reconciliation engine; they're AP/AR (complementary) |
+
+---
+
+## Engineering Principles
+
+These principles follow directly from the platform architecture above. They are not optional.
+
+### 1. StorageAdapter is the database boundary
+
+All database access goes through the `StorageAdapter` interface in `storage/adapter.ts`. The current implementation is SQLite. When TreasuryOS launches, all 10 agents share a Postgres database. Every new database method you add must go through this interface. Never access SQLite directly outside of `sqlite.ts`. Never import `bun:sqlite` in any file other than `sqlite.ts`.
+
+### 2. Emit events for everything meaningful
+
+The event emitter (`events/emitter.ts`) is currently local-only. In TreasuryOS, it becomes the cross-agent event bus. When ReconAgent detects an anomaly, RiskGuard needs to hear about it. When a bridge leg is matched, CloseAgent uses that for month-end. When a transaction is classified with LOW confidence, BriefAgent includes it in the weekly report. When you build a new capability, ask: "Would another agent care about this?" If yes, emit an event.
+
+### 3. Interfaces are shared contracts
+
+Other agents will import ReconAgent's types. `ClassifiedTransaction`, `JournalEntry`, `ReconciliationReport`, `PricePoint` - these are shared data contracts across the platform. Changes to these types ripple across all 10 agents. Be deliberate about additions. Never remove or rename fields without understanding the downstream impact. Add new optional fields rather than changing existing ones.
+
+### 4. Classification audit trails are non-negotiable
+
+Every classification must include: method used, rule ID (if applicable), confidence level, rationale, model version, and data lineage. This isn't just for debugging. The compliance layer (TreasuryOS Layer 4) uses these audit trails for SOC 2 reporting, regulator exports, and client-facing audit packages. If you add a new classifier or rule, it must produce the same `ClassificationAudit` metadata.
+
+### 5. Think multi-tenant even though we're single-tenant now
+
+ReconAgent currently processes one set of wallets from env config. TreasuryOS will serve multiple clients, each with their own wallets, accounting config, classification rules, and chart of accounts. Don't hardcode anything that should be per-client. The config system (`config.ts`) and accounting config (`input.ts > AccountingConfig`) are designed to be per-tenant eventually. Keep it that way.
+
+### 6. Decimal strings for money. No exceptions.
+
+All 10 agents share monetary data. If you introduce a JavaScript `number` type for money anywhere, it will cause precision errors downstream when CloseAgent sums journal entries, when TaxLot calculates cost basis across agents, or when BriefAgent computes portfolio totals. Use strings like `"1500.00"`. Parse only at display time. This is the hardest convention to maintain and the most important one.
+
+### 7. The append-only audit log is the compliance moat
+
+The database trigger preventing UPDATE/DELETE on `audit_log` is intentional and critical. Enterprise clients pay for auditability. This is what separates TreasuryOS from a dashboard. Every action taken by any agent in the platform will be logged here. When you add new operations, log them to the audit trail with full context (event type, transaction ID, wallet, chain, details JSON, model version).
+
+### 8. New code must be testable in isolation
+
+Every module you add should be testable without standing up the full pipeline. Classifiers should accept a `RawTransaction` and return a result. Pricing adapters should accept a token address and return a `PricePoint`. Journal generators should accept a `ClassifiedTransaction` and return entries. Keep side effects (database writes, API calls, event emission) at the edges. This matters because other agents will reuse these modules.
+
+---
+
 ## Quick Start
 
 ```bash
@@ -596,16 +739,6 @@ If you're onboarding, read in this order:
 
 ---
 
-## Strategic Context
+## Questions?
 
-ReconAgent solves a validated $130M+ pain point (Fireblocks acquired TRES Finance for that amount just to solve reconciliation). The competitive landscape:
-
-- **TRES Finance** (acquired by Fireblocks) - aggregates from 220+ sources, enterprise-focused
-- **Bitwave** - enterprise crypto accounting, partnered with Deloitte
-- **Cryptio** - crypto accounting for funds
-- **Coinshift** - DAO treasury platform with multisig + cashflow reporting
-- **Request Finance** - crypto invoicing for DAOs
-
-ReconAgent's differentiation: DeFi-deep classification (understands protocol mechanics, not just "known contract" matching), multi-chain reconciliation with bridge correlation, AI-powered classification that learns, and open architecture designed to be one component of a larger agent platform.
-
-The 9 other enterprise agent products planned alongside ReconAgent (YieldPilot, GovExec, DiversifyAgent, TaxLot, RiskGuard, CloseAgent, PayAgent, BriefAgent, StableShield) will all feed data into and consume data from ReconAgent's reconciliation engine.
+If something in this codebase doesn't make sense, check the README first, then RESEARCH.md for the problem-space research. If a design decision feels arbitrary, it probably ties back to the platform architecture described at the top of this document. When in doubt, ask before refactoring - what looks like unnecessary abstraction is often a platform integration point.
